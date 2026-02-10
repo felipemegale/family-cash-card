@@ -11,7 +11,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.security.Principal;
 import java.util.List;
-import java.util.Optional;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.PathVariable;
 
 @RestController
 @RequestMapping("/cashcards")
@@ -22,15 +24,18 @@ class CashCardController {
         this.cashCardRepository = cashCardRepository;
     }
 
+    private CashCard findCashCard(Long requestedId, Principal principal) {
+        return cashCardRepository.findByIdAndOwner(requestedId, principal.getName());
+    }
+
     @GetMapping("/{requestedId}")
     private ResponseEntity<CashCard> findById(@PathVariable Long requestedId, Principal principal) {
-        Optional<CashCard> cashCardOptional = Optional
-                .ofNullable(cashCardRepository.findByIdAndOwner(requestedId, principal.getName()));
-        if (cashCardOptional.isPresent()) {
-            return ResponseEntity.ok(cashCardOptional.get());
-        } else {
+        CashCard cashCard = findCashCard(requestedId, principal);
+
+        if (cashCard == null)
             return ResponseEntity.notFound().build();
-        }
+
+        return ResponseEntity.ok(cashCard);
     }
 
     @PostMapping
@@ -53,5 +58,19 @@ class CashCardController {
                         pageable.getPageSize(),
                         pageable.getSortOr(Sort.by(Sort.Direction.ASC, "amount"))));
         return ResponseEntity.ok(page.getContent());
+    }
+
+    @PutMapping("/{requestedId}")
+    private ResponseEntity<Void> putCashCard(@PathVariable Long requestedId, @RequestBody CashCard cashCardUpdate,
+            Principal principal) {
+        CashCard cashCard = findCashCard(requestedId, principal);
+
+        if (cashCard == null)
+            return ResponseEntity.notFound().build();
+
+        CashCard updatedCashCard = new CashCard(cashCard.id(), cashCardUpdate.amount(), principal.getName());
+        cashCardRepository.save(updatedCashCard);
+
+        return ResponseEntity.noContent().build();
     }
 }
